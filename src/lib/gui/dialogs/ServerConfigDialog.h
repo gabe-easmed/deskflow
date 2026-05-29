@@ -65,6 +65,8 @@ protected:
 
   void toggleClipboard(bool enabled);
   void setClipboardLimit(int limit);
+  void updateClipboardFormats();
+  void setClipboardDirection(int index);
 
   void toggleHeartbeat(bool enabled);
   void setHeartbeat(int rate);

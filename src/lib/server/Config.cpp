@@ -676,6 +676,10 @@ void Config::readSectionOptions(ConfigReadContext &s)
       addOption("", kOptionClipboardSharing, s.parseBoolean(value));
     } else if (name == "clipboardSharingSize") {
       addOption("", kOptionClipboardSharingSize, s.parseInt(value));
+    } else if (name == "clipboardFormats") {
+      addOption("", kOptionClipboardFormats, s.parseInt(value));
+    } else if (name == "clipboardDirection") {
+      addOption("", kOptionClipboardDirection, s.parseInt(value));
     } else {
       handled = false;
     }
@@ -1260,6 +1264,12 @@ const char *Config::getOptionName(OptionID id)
   if (id == kOptionClipboardSharingSize) {
     return "clipboardSharingSize";
   }
+  if (id == kOptionClipboardFormats) {
+    return "clipboardFormats";
+  }
+  if (id == kOptionClipboardDirection) {
+    return "clipboardDirection";
+  }
   return nullptr;
 }
 
@@ -1268,8 +1278,7 @@ std::string Config::getOptionValue(OptionID id, OptionValue value)
   if (id == kOptionHalfDuplexCapsLock || id == kOptionHalfDuplexNumLock || id == kOptionHalfDuplexScrollLock ||
       id == kOptionScreenSwitchNeedsShift || id == kOptionScreenSwitchNeedsControl ||
       id == kOptionScreenSwitchNeedsAlt || id == kOptionXTestXineramaUnaware || id == kOptionRelativeMouseMoves ||
-      id == kOptionWin32KeepForeground || id == kOptionScreenPreserveFocus || id == kOptionClipboardSharing ||
-      id == kOptionClipboardSharingSize) {
+      id == kOptionWin32KeepForeground || id == kOptionScreenPreserveFocus || id == kOptionClipboardSharing) {
     return (value != 0) ? "true" : "false";
   }
   if (id == kOptionModifierMapForShift || id == kOptionModifierMapForControl || id == kOptionModifierMapForAlt ||
@@ -1298,7 +1307,8 @@ std::string Config::getOptionValue(OptionID id, OptionValue value)
     }
   }
   if (id == kOptionHeartbeat || id == kOptionScreenSwitchCornerSize || id == kOptionScreenSwitchDelay ||
-      id == kOptionScreenSwitchTwoTap) {
+      id == kOptionScreenSwitchTwoTap || id == kOptionClipboardSharingSize ||
+      id == kOptionClipboardFormats || id == kOptionClipboardDirection) {
     return deskflow::string::sprintf("%d", value);
   }
   if (id == kOptionScreenSwitchCorners) {

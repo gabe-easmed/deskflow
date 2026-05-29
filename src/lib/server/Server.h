@@ -472,4 +472,12 @@ private:
   bool m_defaultLockToScreenState = false;
   bool m_disableLockToScreen = false;
   bool m_enableClipboard = true;
+
+  // bitmask of IClipboard::Format bits allowed to sync (default: all)
+  uint32_t m_clipboardFormats = 7;
+
+  // 0=bidirectional, 1=server→client only, 2=client→server only
+  int32_t m_clipboardDirection = 0;
+
+  void lockAllScreens();
 };

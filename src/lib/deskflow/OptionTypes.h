@@ -59,6 +59,23 @@ static const OptionID kOptionDefaultLockToScreenState = OPTION_CODE("LTSS");
 static const OptionID kOptionDisableLockToScreen = OPTION_CODE("DLTS");
 static const OptionID kOptionClipboardSharing = OPTION_CODE("CLPS");
 static const OptionID kOptionClipboardSharingSize = OPTION_CODE("CLSZ");
+static const OptionID kOptionClipboardFormats = OPTION_CODE("CLPF");
+static const OptionID kOptionClipboardDirection = OPTION_CODE("CLPD");
+//@}
+
+//! @name Clipboard format bitmasks (for kOptionClipboardFormats)
+//@{
+static const OptionValue kClipboardFormatText = 1 << 0;
+static const OptionValue kClipboardFormatHTML = 1 << 1;
+static const OptionValue kClipboardFormatBitmap = 1 << 2;
+static const OptionValue kClipboardFormatsAll = (1 << 0) | (1 << 1) | (1 << 2);
+//@}
+
+//! @name Clipboard direction values (for kOptionClipboardDirection)
+//@{
+static const OptionValue kClipboardDirectionBidirectional = 0;
+static const OptionValue kClipboardDirectionServerToClient = 1;
+static const OptionValue kClipboardDirectionClientToServer = 2;
 //@}
 
 //! @name Screen switch corner masks

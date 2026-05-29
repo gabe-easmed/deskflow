@@ -26,15 +26,18 @@
 #include "server/PrimaryClient.h"
 
 #ifdef _WIN32
-#include <algorithm>
 #include <array>
 #endif
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
 
 using namespace deskflow::server;
+
+// forward declaration — defined at end of file
+static Clipboard makeFilteredClipboard(const Clipboard &src, uint32_t formats);
 
 //
 // Server
@@ -112,6 +115,9 @@ Server::Server(ServerConfig &config, PrimaryClient *primaryClient, deskflow::Scr
   });
   m_events->addHandler(EventTypes::ServerLockCursorToScreen, m_inputFilter, [this](const auto &e) {
     handleLockCursorToScreenEvent(e);
+  });
+  m_events->addHandler(EventTypes::ServerLockAllScreens, m_inputFilter, [this](const auto &) {
+    lockAllScreens();
   });
   m_events->addHandler(EventTypes::PrimaryScreenFakeInputBegin, m_inputFilter, [this](const auto &) {
     m_primaryClient->fakeInputBegin();
@@ -474,13 +480,17 @@ void Server::switchScreen(BaseClientProxy *dst, int32_t x, int32_t y, bool forSc
     m_active->enter(x, y, m_seqNum, m_primaryClient->getToggleMask(), forScreensaver);
 
     if (m_enableClipboard) {
-      // send the clipboard data to new active screen
-      for (ClipboardID id = 0; id < kClipboardEnd; ++id) {
-        // Hackity hackity hack
-        if (m_clipboards[id].m_clipboard.marshall().size() > (m_maximumClipboardSize * 1024)) {
-          continue;
+      // Feature: direction=client-to-server — never push clipboard to clients
+      const bool pushToClient =
+          m_clipboardDirection != kClipboardDirectionClientToServer || m_active == m_primaryClient;
+      if (pushToClient) {
+        for (ClipboardID id = 0; id < kClipboardEnd; ++id) {
+          Clipboard filtered = makeFilteredClipboard(m_clipboards[id].m_clipboard, m_clipboardFormats);
+          if (filtered.marshall().size() > m_maximumClipboardSize * 1024) {
+            continue;
+          }
+          m_active->setClipboard(id, &filtered);
         }
-        m_active->setClipboard(id, &m_clipboards[id].m_clipboard);
       }
     }
 
@@ -1124,6 +1134,16 @@ void Server::processOptions()
       } else {
         m_maximumClipboardSize = static_cast<size_t>(value);
       }
+    } else if (id == kOptionClipboardFormats) {
+      m_clipboardFormats = static_cast<uint32_t>(value);
+      LOG_INFO("clipboard format filter set to 0x%x (text=%d html=%d bitmap=%d)", m_clipboardFormats,
+               !!(m_clipboardFormats & kClipboardFormatText),
+               !!(m_clipboardFormats & kClipboardFormatHTML),
+               !!(m_clipboardFormats & kClipboardFormatBitmap));
+    } else if (id == kOptionClipboardDirection) {
+      m_clipboardDirection = value;
+      const char *dirs[] = {"bidirectional", "server-to-client", "client-to-server"};
+      LOG_INFO("clipboard direction set to: %s", dirs[std::clamp(value, 0, 2)]);
     }
   }
   if (m_relativeMoves && !newRelativeMoves) {
@@ -1171,6 +1191,12 @@ void Server::handleClipboardGrabbed(const Event &event, BaseClientProxy *grabber
 
   // ignore events from unknown clients
   if (!m_clientSet.contains(grabber)) {
+    return;
+  }
+
+  // Feature: direction=server-to-client — ignore clipboard grabs from clients
+  if (m_clipboardDirection == kClipboardDirectionServerToClient && grabber != m_primaryClient) {
+    LOG_DEBUG("clipboard grab from \"%s\" ignored (server-to-client direction)", getName(grabber).c_str());
     return;
   }
   const auto *info = static_cast<const IScreen::ClipboardInfo *>(event.getData());
@@ -1454,25 +1480,32 @@ void Server::onClipboardChanged(const BaseClientProxy *sender, ClipboardID id, u
   // should be the expected client
   assert(sender == m_clients.find(clipboard.m_clipboardOwner)->second);
 
-  // get data
+  // get raw data from sender
   sender->getClipboard(id, &clipboard.m_clipboard);
 
-  std::string data = clipboard.m_clipboard.marshall();
+  // Feature: apply format filter before any size check or distribution
+  Clipboard filtered = makeFilteredClipboard(clipboard.m_clipboard, m_clipboardFormats);
+  std::string data = filtered.marshall();
+
   if (data.size() > m_maximumClipboardSize * 1024) {
-    LOG_INFO(
-        "not updating clipboard because it's over the size limit (%i KB) configured by the server",
-        m_maximumClipboardSize
+    // Feature: bump to WARNING so the GUI log highlights it, and emit event
+    LOG_WARN(
+        "clipboard from \"%s\" dropped: %zu KB exceeds %zu KB limit (formats mask=0x%x)",
+        clipboard.m_clipboardOwner.c_str(),
+        data.size() / 1024,
+        m_maximumClipboardSize,
+        m_clipboardFormats
     );
+    m_events->addEvent(Event(EventTypes::ServerClipboardTruncated, this));
     return;
   }
 
-  // ignore if data hasn't changed
+  // ignore if filtered data hasn't changed
   if (data == clipboard.m_clipboardData) {
     LOG_DEBUG("ignored screen \"%s\" update of clipboard %d (unchanged)", clipboard.m_clipboardOwner.c_str(), id);
     return;
   }
 
-  // got new data
   LOG_INFO("screen \"%s\" updated clipboard %d", clipboard.m_clipboardOwner.c_str(), id);
   clipboard.m_clipboardData = data;
 
@@ -1482,8 +1515,12 @@ void Server::onClipboardChanged(const BaseClientProxy *sender, ClipboardID id, u
     client->setClipboardDirty(id, client != sender);
   }
 
-  // send the new clipboard to the active screen
-  m_active->setClipboard(id, &clipboard.m_clipboard);
+  // Feature: direction=client-to-server — do not push clipboard to clients
+  if (m_clipboardDirection == kClipboardDirectionClientToServer && m_active != m_primaryClient) {
+    return;
+  }
+
+  m_active->setClipboard(id, &filtered);
 }
 
 void Server::onScreensaver(bool activated)
@@ -2068,4 +2105,32 @@ void Server::forceLeaveClient(const BaseClientProxy *client)
 
   // tell primary client about the active sides
   m_primaryClient->reconfigure(getActivePrimarySides());
+}
+
+// Feature: clipboard format filtering helper
+static Clipboard makeFilteredClipboard(const Clipboard &src, uint32_t formats)
+{
+  using Format = IClipboard::Format;
+  Clipboard filtered;
+  filtered.open(0);
+  filtered.empty();
+  src.open(0);
+  if ((formats & kClipboardFormatText) && src.has(Format::Text))
+    filtered.add(Format::Text, src.get(Format::Text));
+  if ((formats & kClipboardFormatHTML) && src.has(Format::HTML))
+    filtered.add(Format::HTML, src.get(Format::HTML));
+  if ((formats & kClipboardFormatBitmap) && src.has(Format::Bitmap))
+    filtered.add(Format::Bitmap, src.get(Format::Bitmap));
+  src.close();
+  filtered.close();
+  return filtered;
+}
+
+// Feature: lock all connected screens
+void Server::lockAllScreens()
+{
+  LOG_INFO("locking all screens");
+  for (auto &[name, client] : m_clients) {
+    client->screensaver(true);
+  }
 }

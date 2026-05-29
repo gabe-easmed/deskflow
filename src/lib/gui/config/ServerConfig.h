@@ -126,6 +126,14 @@ public:
     return m_ClipboardSharingSize;
   }
   static size_t defaultClipboardSharingSize();
+  uint32_t clipboardFormats() const
+  {
+    return m_ClipboardFormats;
+  }
+  int clipboardDirection() const
+  {
+    return m_ClipboardDirection;
+  }
 
   bool save(const QString &fileName) const;
   bool screenExists(const QString &screenName) const;
@@ -219,6 +227,14 @@ private:
   {
     m_ClipboardSharing = on;
   }
+  void setClipboardFormats(uint32_t formats)
+  {
+    m_ClipboardFormats = formats;
+  }
+  void setClipboardDirection(int direction)
+  {
+    m_ClipboardDirection = direction;
+  }
   void setConfigFile(const QString &configFile) const;
   void setUseExternalConfig(bool useExternalConfig) const;
   size_t setClipboardSharingSize(size_t size);
@@ -248,6 +264,8 @@ private:
   bool m_DefaultLockToScreenState = false;
   bool m_DisableLockToScreen = false;
   bool m_ClipboardSharing = true;
+  uint32_t m_ClipboardFormats = 7;  // all formats enabled by default
+  int m_ClipboardDirection = 0;     // 0=bidirectional, 1=server→client, 2=client→server
   QString m_ClientAddress = "";
   QList<bool> m_SwitchCorners;
   HotkeyList m_Hotkeys;

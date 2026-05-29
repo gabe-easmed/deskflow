@@ -150,6 +150,12 @@ enum class EventTypes : uint32_t
   /// This event is sent when the computer has been switched to a client.
   ServerScreenSwitched,
 
+  /// Sent when a clipboard payload was silently dropped for exceeding the size limit.
+  ServerClipboardTruncated,
+
+  /// Sent to instruct the server to lock all connected screens immediately.
+  ServerLockAllScreens,
+
   ServerAppReloadConfig,
   ServerAppForceReconnect,
   ServerAppResetServer,

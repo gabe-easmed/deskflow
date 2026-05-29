@@ -151,6 +151,25 @@ ServerConfigDialog::ServerConfigDialog(QWidget *parent, ServerConfig &config)
   ui->sbClipboardSizeLimit->setValue(clipboardSharingSizeM);
   ui->sbClipboardSizeLimit->setEnabled(serverConfig().clipboardSharing());
 
+  // Format filter checkboxes (bit 0=Text, bit 1=HTML, bit 2=Bitmap)
+  const uint32_t formats = serverConfig().clipboardFormats();
+  ui->cbClipboardText->setChecked(formats & 1u);
+  ui->cbClipboardHTML->setChecked(formats & 2u);
+  ui->cbClipboardBitmap->setChecked(formats & 4u);
+  connect(ui->cbClipboardText,   &QCheckBox::toggled, this, &ServerConfigDialog::updateClipboardFormats);
+  connect(ui->cbClipboardHTML,   &QCheckBox::toggled, this, &ServerConfigDialog::updateClipboardFormats);
+  connect(ui->cbClipboardBitmap, &QCheckBox::toggled, this, &ServerConfigDialog::updateClipboardFormats);
+
+  // Direction combobox (0=Bidirectional, 1=Server→Client, 2=Client→Server)
+  ui->cbClipboardDirection->addItem(tr("Bidirectional"));
+  ui->cbClipboardDirection->addItem(tr("Server → Client only"));
+  ui->cbClipboardDirection->addItem(tr("Client → Server only"));
+  ui->cbClipboardDirection->setCurrentIndex(serverConfig().clipboardDirection());
+  connect(
+      ui->cbClipboardDirection, QOverload<int>::of(&QComboBox::currentIndexChanged),
+      this, &ServerConfigDialog::setClipboardDirection
+  );
+
   for (const Hotkey &hotkey : std::as_const(serverConfig().hotkeys()))
     ui->listHotkeys->addItem(hotkey.text());
 
@@ -341,6 +360,22 @@ void ServerConfigDialog::toggleClipboard(bool enabled)
 void ServerConfigDialog::setClipboardLimit(int limit)
 {
   serverConfig().setClipboardSharingSize(limit * 1024);
+  onChange();
+}
+
+void ServerConfigDialog::updateClipboardFormats()
+{
+  uint32_t formats = 0;
+  if (ui->cbClipboardText->isChecked())   formats |= 1u;
+  if (ui->cbClipboardHTML->isChecked())   formats |= 2u;
+  if (ui->cbClipboardBitmap->isChecked()) formats |= 4u;
+  serverConfig().setClipboardFormats(formats);
+  onChange();
+}
+
+void ServerConfigDialog::setClipboardDirection(int index)
+{
+  serverConfig().setClipboardDirection(index);
   onChange();
 }
 

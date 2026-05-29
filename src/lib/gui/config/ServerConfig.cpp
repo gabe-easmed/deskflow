@@ -118,6 +118,8 @@ void ServerConfig::commit()
   settings().setValue("disableLockToScreen", disableLockToScreen());
   settings().setValue("clipboardSharing", clipboardSharing());
   settings().setValue("clipboardSharingSize", QVariant::fromValue(clipboardSharingSize()));
+  settings().setValue("clipboardFormats", QVariant::fromValue(clipboardFormats()));
+  settings().setValue("clipboardDirection", clipboardDirection());
 
   writeSettings(settings(), switchCorners(), "switchCorner");
 
@@ -172,6 +174,8 @@ void ServerConfig::recall()
       settings().value("clipboardSharingSize", (int)ServerConfig::defaultClipboardSharingSize()).toULongLong()
   );
   setClipboardSharing(settings().value("clipboardSharing", true).toBool());
+  setClipboardFormats(settings().value("clipboardFormats", 7u).toUInt());
+  setClipboardDirection(settings().value("clipboardDirection", 0).toInt());
 
   readSettings(settings(), switchCorners(), "switchCorner", false, static_cast<int>(NumSwitchCorners));
 

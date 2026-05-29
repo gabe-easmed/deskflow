@@ -21,3 +21,11 @@ create_test(
   WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/server"
 )
 
+create_test(
+  NAME ClipboardSyncTests
+  DEPENDS server
+  LIBS base arch ${extra_libs}
+  SOURCE ClipboardSyncTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/server"
+)
+
